@@ -45,7 +45,7 @@ glimpse(spp_rcbd_df)
 # c) Wrangling
 ```{r rcbd_dfw}
 spp_rcbd_dfw <- spp_rcbd_df %>%
-  mutate(block = factor(block),
+  mutate(rep = factor(rep),
          nrate_kgha = factor(nrate_kgha),
          krate_kgha = factor(krate_kgha) 
          ) %>%
@@ -109,11 +109,19 @@ We have 2 random variance component from the split-plot because we have 2 differ
 options(contrasts = c("contr.sum", "contr.poly"))
 
 # Model fitting
-spp_rcbd_mix_mod 
-
+spp_rcbd_mix_mod <- lmer(yield_kgha ~ krate_kgha*nrate_kgha + (1|rep/krate_kgha),
+                         data = spp_rcbd_dfw)
+       
+spp_rcbd_mix_mod                  
 # Summary
 summary(spp_rcbd_mix_mod)
 ```
+
+(1|rep/krate_kgha) means krate_kgha nested in rep
+#Assuming split-split-plot
+spp_rcbd_mix_mod <- lmer(yield_kgha ~ krate_kgha*nrate_kgha*prate_kgha + (1|rep/krate_kgha/nrate_kgha))
+
+If massive structure then leaving smaller size which goes into the residual
 
 Notice now how the `summary()` above has a new section for **random effects**, with 3 rows:  
   - One for krate_kgha:block  
@@ -155,7 +163,7 @@ One difference in mixed models is that the 3 first assumptions are also applied 
 
 ### Block random effects are iid ~ N(0,var_a)  
 ```{r randeff_block}
-randeff_block
+randeff_block <- ranef(spp_rcbd_mix_mod)$rep
 
 randeff_block
 ```
@@ -178,7 +186,7 @@ Nothing to worry here, especially since we only have 4 points.
 
 ### Block:krate random effects are iid ~ N(0,var_b)  
 ```{r randeff_block}
-randeff_blockkrate 
+randeff_blockkrate <- ranef(spp_rcbd_mix_mod)$`krate_kgha:rep`
 
 randeff_blockkrate
 ```
@@ -251,10 +259,11 @@ Remember that it is at this level that we establish the hierarchy of how our pai
 Let's extract it by comparing everything to everything else.
 ```{r interaction means all}
 spp_rcbd_mix_means_all <- emmeans(spp_rcbd_mix_mod, 
-                                  ~nrate_kgha:krate_kgha)
+                                  ~krate_kgha:nrate_kgha)
 
 spp_rcbd_mix_means_all
 ```
+- nrate_kgha:krate_kgha: SE =330, df = 22.9
 
 In a split-plot, we have 2 sources of error because we have 2 different sizes of EU that were randomized separately.  
 
@@ -263,21 +272,31 @@ When we ask for the interaction means (like in chunk above), the emmean error is
 What happens with the emmean error if we ask for the emmean of the main effects of K and N rate separately? 
 
 ```{r k rate means}
+spp_rcbd_k_means <- emmeans(spp_rcbd_mix_mod, ~krate_kgha)
 
+spp_rcbd_k_means
 ```
 The SE of the whole-plot treatment factor (k rate) is **232**.
+- krtae_kgha: SE = 232, df = 8.28
+
 
 What about for the split-plot treatment factor (n rate)?  
 
 ```{r n rate means }
+spp_rcbd_n_means <- emmeans(spp_rcbd_mix_mod, ~nrate_kgha)
 
+spp_rcbd_n_means
 ```
 It is 209.  
+- nrate_kgha: SE = 209, df = 8.19
+
+SE of n and k rate are different-- tested with mean square of split plot error (Split plot error df is 18(more df))
 
 Points to notice:  
   - The **SE of the WP and SP treatment factors is different**! On the RCBD case we ran last exercise, they were the same because we only had one experimental size unit.  
   
-  - The **SE of the SP treatment factor will always be lower than that from the WP treatment factor**. Why?  
+  - The **SE of the SP treatment factor will always be lower than that from the WP treatment factor**. Why? 
+  because of observations going into the error, test the effect
   
   - When comparing means from the interaction, the SE of those means is a combination of the SEs from both WP and SP errors.  
   
@@ -337,4 +356,5 @@ ggsave("../output/spp_rcbd_mix_means.png",
 
 What happened the letter separation compared to the RCBD mixed with blocks random?  
 
+we observe a different letter compared to RCBD mixed with blocks random
 
